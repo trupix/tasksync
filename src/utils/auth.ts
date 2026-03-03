@@ -1,5 +1,5 @@
 /**
- * Auth utility — manages GitHub PAT storage and verification.
+ * Auth utility â€” manages GitHub PAT storage and verification.
  *
  * Token is stored in ~/.TaskSync/auth.json with chmod 600.
  * Never written to git config, env files, or remote URLs.
@@ -65,11 +65,11 @@ export function verifyToken(pat: string): Promise<GitHubUser> {
               reject(new Error("Failed to parse GitHub API response"));
             }
           } else if (res.statusCode === 401) {
-            reject(new Error("Invalid token — authentication failed (401)"));
+            reject(new Error("Invalid token â€” authentication failed (401)"));
           } else if (res.statusCode === 403) {
             reject(
               new Error(
-                "Token forbidden (403) — check scopes. Required: repo"
+                "Token forbidden (403) â€” check scopes. Required: repo"
               )
             );
           } else {
@@ -219,7 +219,7 @@ export function getAuthStatus(): {
 /** Mask a token for display: show first 4 and last 4 chars. */
 function maskToken(token: string): string {
   if (token.length <= 12) return "****";
-  return `${token.slice(0, 4)}${"•".repeat(Math.min(token.length - 8, 28))}${token.slice(-4)}`;
+  return `${token.slice(0, 4)}${"â€¢".repeat(Math.min(token.length - 8, 28))}${token.slice(-4)}`;
 }
 
 // --- Interactive prompt ------------------------------------------------------
@@ -274,13 +274,13 @@ export function prompt(question: string, options?: { mask?: boolean }): Promise<
             }
           } else {
             input += c;
-            stdout.write("•");
+            stdout.write("â€¢");
           }
         };
 
         stdin.on("data", onData);
       } else {
-        // Not a TTY — just read normally (e.g. piped input)
+        // Not a TTY â€” just read normally (e.g. piped input)
         rl.question("", (answer) => {
           rl.close();
           resolve(answer.trim());
@@ -359,5 +359,91 @@ export function promptSelect(question: string, options: string[]): Promise<numbe
     };
 
     stdin.on("data", onData);
+  });
+}
+
+// --- GitHub repo helpers -----------------------------------------------------
+
+/**
+ * Check whether a GitHub repo already exists on the authenticated user's account.
+ * Returns true (exists) or false (not found). Throws on network/auth errors.
+ */
+export function checkGitHubRepoExists(pat: string, owner: string, repoName: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: "api.github.com",
+        path: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repoName)}`,
+        method: "GET",
+        headers: {
+          Authorization: `token ${pat}`,
+          "User-Agent": "TaskSync-cli",
+          Accept: "application/vnd.github+json",
+        },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => (body += chunk));
+        res.on("end", () => {
+          if (res.statusCode === 200) resolve(true);
+          else if (res.statusCode === 404) resolve(false);
+          else reject(new Error(`GitHub API returned ${res.statusCode}`));
+        });
+      }
+    );
+    req.on("error", (e) => reject(new Error(`Network error: ${e.message}`)));
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error("Timeout checking repository")); });
+    req.end();
+  });
+}
+
+/**
+ * Create a new private GitHub repository for the authenticated user.
+ * Returns the clone URL and HTML URL on success.
+ */
+export function createGitHubRepo(
+  pat: string,
+  repoName: string,
+  description = "TaskSync data repository"
+): Promise<{ cloneUrl: string; htmlUrl: string }> {
+  const body = JSON.stringify({ name: repoName, private: true, description, auto_init: false });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: "api.github.com",
+        path: "/user/repos",
+        method: "POST",
+        headers: {
+          Authorization: `token ${pat}`,
+          "User-Agent": "TaskSync-cli",
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          if (res.statusCode === 201) {
+            try {
+              const repo = JSON.parse(data);
+              resolve({ cloneUrl: repo.clone_url, htmlUrl: repo.html_url });
+            } catch {
+              reject(new Error("Failed to parse repo creation response"));
+            }
+          } else if (res.statusCode === 422) {
+            reject(new Error("A repository with that name already exists on your account."));
+          } else {
+            reject(new Error(`GitHub API returned ${res.statusCode}: ${data.substring(0, 200)}`));
+          }
+        });
+      }
+    );
+    req.on("error", (e) => reject(new Error(`Network error: ${e.message}`)));
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error("Timeout creating repository")); });
+    req.write(body);
+    req.end();
   });
 }
