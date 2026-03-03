@@ -117,17 +117,21 @@ export async function startDashboard(port: number, openBrowser: boolean) {
   // --- API Routes ----------------------------------------------------------
 
   app.get("/api/providers", (req, res) => {
-    const result = providers.map(p => ({
-      name: p.getProviderName(),
-      roots: p.getRoots().map(r => ({
-        id: r.id,
-        label: r.label,
-        path: r.path,
-        isInitialized: p.validateRoot(r.path),
-        syncInitialized: !!readManifest(r.path),
-      }))
-    }));
-    res.json({ providers: result });
+    try {
+      const result = providers.map(p => ({
+        name: p.getProviderName(),
+        roots: p.getRoots().map(r => ({
+          id: r.id,
+          label: r.label,
+          path: r.path,
+          isInitialized: p.validateRoot(r.path),
+          syncInitialized: r.path ? !!readManifest(r.path) : false,
+        }))
+      }));
+      res.json({ providers: result });
+    } catch (e: any) {
+      safeErr(res, 500, e.message);
+    }
   });
 
   app.post("/api/init", requireAuth, async (req, res) => {
