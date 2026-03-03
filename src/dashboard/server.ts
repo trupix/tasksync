@@ -7,7 +7,9 @@ import { RooProvider } from "../providers/roo";
 import { KiloProvider } from "../providers/kilo";
 import { OpenClawProvider } from "../providers/openclaw";
 import { IProvider, ProviderRoot } from "../providers/interface";
-import { runInit, runSync } from "../core/sync";
+import { runUnifiedInit, runUnifiedSync, runInit, runSync } from "../core/sync";
+import { getSyncRepoPath } from "../utils/identity";
+import { readUnifiedManifest } from "../utils/manifest";
 import { getTasksForRoot } from "../core/tasks/indexer";
 import { exportTaskBundle, importTaskBundle } from "../core/tasks/migration";
 import {
@@ -125,7 +127,13 @@ export async function startDashboard(port: number, openBrowser: boolean) {
           label: r.label,
           path: r.path,
           isInitialized: p.validateRoot(r.path),
-          syncInitialized: r.path ? !!readManifest(r.path) : false,
+          syncInitialized: (() => {
+            // Check unified manifest first, fall back to per-provider manifest
+            const syncRepoPath = getSyncRepoPath();
+            const unified = readUnifiedManifest(syncRepoPath);
+            if (unified?.providers[p.getProviderName()]) return true;
+            return r.path ? !!readManifest(r.path) : false;
+          })(),
         }))
       }));
       res.json({ providers: result });
@@ -142,7 +150,8 @@ export async function startDashboard(port: number, openBrowser: boolean) {
       if (typeof repoUrl !== "string" || !repoUrl.startsWith("http")) return void safeErr(res, 400, "Invalid repoUrl");
       const p = getProvider(provider);
       const r = getRoot(p, rootId);
-      await runInit(p, r.id, r.path, r.label, { repoUrl, pat });
+      // Use unified model: one central repo with provider subfolders
+      await runUnifiedInit([{ provider: p, root: r }], { repoUrl, pat });
       res.json({ success: true });
     } catch (e: any) {
       safeErr(res, 500, e.message);
@@ -156,7 +165,8 @@ export async function startDashboard(port: number, openBrowser: boolean) {
       if (!isValidRootId(rootId)) return void safeErr(res, 400, "Invalid rootId");
       const p = getProvider(provider);
       const r = getRoot(p, rootId);
-      await runSync(p, r.path);
+      // Use unified model
+      await runUnifiedSync([{ provider: p, root: r }]);
       res.json({ success: true });
     } catch (e: any) {
       safeErr(res, 500, e.message);

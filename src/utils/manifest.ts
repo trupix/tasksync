@@ -53,3 +53,52 @@ export function touchLastSynced(dataPath: string): void {
   manifest.lastSyncedAt = new Date().toISOString();
   writeManifest(dataPath, manifest);
 }
+
+// --- Unified manifest (single repo for all providers) -------------------------
+
+export interface ProviderSyncEntry {
+  dataPath: string;
+  lastSyncedAt: string | null;
+  enabled: boolean;
+}
+
+export interface UnifiedManifest {
+  schemaVersion: number;
+  workspaceId: string;
+  repoUrl: string;
+  initializedAt: string;
+  providers: Record<string, ProviderSyncEntry>;
+}
+
+/**
+ * Read the unified manifest from the sync repo root.
+ * Returns null if not found or unreadable.
+ */
+export function readUnifiedManifest(syncRepoPath: string): UnifiedManifest | null {
+  const manifestPath = path.join(syncRepoPath, MANIFEST_FILENAME);
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    const raw = fs.readFileSync(manifestPath, "utf8");
+    return JSON.parse(raw) as UnifiedManifest;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the unified manifest to the sync repo root.
+ */
+export function writeUnifiedManifest(syncRepoPath: string, manifest: UnifiedManifest): void {
+  const manifestPath = path.join(syncRepoPath, MANIFEST_FILENAME);
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+}
+
+/**
+ * Update the `lastSyncedAt` timestamp for a specific provider in the unified manifest.
+ */
+export function touchUnifiedLastSynced(syncRepoPath: string, providerName: string): void {
+  const manifest = readUnifiedManifest(syncRepoPath);
+  if (!manifest?.providers[providerName]) return;
+  manifest.providers[providerName].lastSyncedAt = new Date().toISOString();
+  writeUnifiedManifest(syncRepoPath, manifest);
+}
