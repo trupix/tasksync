@@ -1,0 +1,40 @@
+{
+  "name": "tasksync",
+  "version": "0.1.0",
+  "description": "Sync your AI agent task data (Cline, Roo, Kilo, OpenClaw) across machines using Git.",
+  "main": "build/cli.js",
+  "bin": {
+    "tasksync": "build/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/cli.js",
+    "test": "npx tsx src/utils/__tests__/security.test.ts && npx tsx src/utils/__tests__/git-injection.test.ts && npx tsx src/core/tasks/__tests__/migration.test.ts"
+  },
+  "keywords": [
+    "cline",
+    "tasksync",
+    "sync",
+    "ai",
+    "mcp",
+    "developer-tools"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.3.0",
+    "@types/uuid": "^10.0.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+build/
+.env
+.DS_Store
+*.js.map
+
+# Exclude all markdown files except the main README
+*.md
+!README.md
