@@ -517,10 +517,10 @@ export async function startDashboard(port: number, openBrowser: boolean) {
               icon.textContent = '✓';
               text.textContent = 'Authenticated as @' + (authState.username || 'user') + (authState.maskedToken ? ' · ' + authState.maskedToken : '') + ' — click to manage';
             } else if (authState && authState.authenticated && !hasSyncSetup) {
-              // State 2: authenticated but no sync repo set up → blue
+              // State 2: authenticated but no sync repo set up -> blue
               banner.className = 'auth-banner auth-info';
-              icon.textContent = '🔗';
-              text.textContent = 'Authenticated as @' + (authState.username || 'user') + ' — no sync repo connected yet · click to connect';
+              icon.textContent = '\u2192';
+              text.textContent = 'Authenticated as @' + (authState.username || 'user') + ' \u2014 no sync repo connected yet \u00b7 click to connect';
             } else {
               // State 1: no authentication → amber
               banner.className = 'auth-banner auth-warn';
