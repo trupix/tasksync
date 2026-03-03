@@ -1,370 +1,278 @@
 # TaskSync
 
-The canonical task state layer for AI assistants.
+Portable AI session sync for Cline, Roo, Kilo, and OpenClaw.
 
-TaskSync turns your AI assistant task history into a portable, versioned, reproducible database — owned entirely by you.
+TaskSync keeps your AI coding sessions consistent across machines using Git as a private backend.
 
-Built local-first. Powered by Git. Designed for multi-agent futures.
-
-**Today:**
-
-* Sync Cline across machines
-* Migrate tasks between assistants (Cline, Roo, Kilo, OpenClaw)
-* Replay and inspect canonical task history
-
-**Tomorrow:**
-
-* Unified cloud-addressable tasks
-* Context-safe collaboration
-* Model-aware alignment layers
-* Fork / merge semantics for AI execution
-
-TaskSync is the missing infrastructure between "chat history" and real AI-native work.
-
-**Privacy first. Your data never touches TaskSync servers.**
+Start a session on your work machine. Continue it on your laptop.  
+No hosted servers. No background daemons. Just your repo.
 
 ---
 
-## Why TaskSync Exists
+## What TaskSync Does
 
-AI assistants store critical task history locally in opaque formats.
+TaskSync synchronizes AI assistant state across machines.
 
-That makes it:
+**Supported providers:**
 
-* Hard to sync across machines
-* Impossible to collaborate safely
-* Fragile when switching assistants
-* Risky when upgrading models
-* Non-reproducible when debugging
+- Cline
+- Roo Code
+- Kilo Code
+- OpenClaw
 
-TaskSync introduces a canonical task layer:
+Each provider is synced independently to prevent UI conflicts or state corruption.
 
-```
-provider task ? canonical ingest ? canonical state ? deterministic replay
-```
-
-Instead of treating assistant output as ephemeral chat, TaskSync treats it as structured state.
-
-That unlocks:
-
-* Reproducible task migrations
-* Cross-assistant portability
-* Versioned AI execution history
-* Deterministic replay
-* Explicit machine and workspace identity
-
-TaskSync is not a sync script.
-
-It is a task state engine.
+TaskSync also includes a local dashboard for viewing sessions across providers and manually migrating tasks between them.
 
 ---
 
 ## Core Principles
 
-**Local-first**
-Everything works without a hosted backend.
-
-**User-owned**
-You control the Git remote, access tokens, and encryption.
-
-**Canonical-first**
-All migrations pass through a structured canonical representation.
-
-**Deterministic**
-Tasks can be replayed and materialized consistently.
-
-**Composable**
-Designed to support multi-agent orchestration and future cloud task envelopes.
+- Local-first
+- Git-powered
+- No cloud dependency
+- No auto-merging across tools
+- Explicit cross-tool migration only
 
 ---
 
-## What It Does Today
+## Installation (Local Development)
 
-### 1. Sync Cline Across Machines
-
-Cline stores task data in:
-
-```
-~/.cline/data/
-```
-
-TaskSync converts that directory into a managed Git repository and syncs it to a private remote you own.
-
-On each machine:
+Clone the repository:
 
 ```bash
-TaskSync init
-```
-
-* Initializes Git
-* Writes a managed `.gitignore`
-* Creates workspace identity
-* Performs initial push
-
-```bash
-TaskSync sync
-```
-
-* Pull (rebase)
-* Commit local changes
-* Push
-
-You now have portable task history.
-
----
-
-### 2. Multi-Provider Migration (Canonical Architecture)
-
-TaskSync supports:
-
-* Cline
-* Roo
-* Kilo
-* OpenClaw
-
-All migrations use a canonical-first pipeline:
-
-```
-provider task
-? canonical ingest
-? canonical state
-? canonical replay/materialize
-? target provider
-```
-
-This ensures:
-
-* High-fidelity migration
-* Structural normalization
-* Future-proof portability
-
-Legacy bundle-based migration is deprecated.
-
----
-
-### 3. Local Dashboard
-
-```bash
-TaskSync dashboard
-```
-
-Features:
-
-* View tasks across providers
-* Inspect canonical state
-* Drag-and-drop migrations
-* Replay canonical runs
-* Compare task lineage
-
-This is not a static viewer — it reflects the underlying canonical graph.
-
----
-
-## Install
-
-```bash
-git clone https://github.com/trupix/TaskSync.git
-cd TaskSync
+git clone <your-repo-url>
+cd tasksync
 npm install
 npm run build
+```
+
+You can then run the CLI directly:
+
+```bash
+node build/cli.js <command>
+```
+
+Or link it globally for development:
+
+```bash
 npm link
 ```
 
-The `TaskSync` command is now available system-wide.
+Then:
+
+```bash
+tasksync <command>
+```
 
 ---
 
 ## Quick Start
 
-**1. Create a private GitHub repository**
-Do not initialize it with files.
-
-**2. Generate a GitHub Personal Access Token**
-Scope required: `repo`
-
-**3. Initialize on first machine:**
+### Initialize Sync
 
 ```bash
-# Option A: SSH (recommended — no token needed)
-TaskSync init git@github.com:YOUR_USERNAME/my-cline-db.git
-
-# Option B: HTTPS with ephemeral PAT (never stored in git config)
-TaskSync init https://github.com/YOUR_USERNAME/my-cline-db.git --pat ghp_YOURTOKEN
-
-# Option C: HTTPS with env var
-export TaskSync_GIT_TOKEN=ghp_YOURTOKEN
-TaskSync init https://github.com/YOUR_USERNAME/my-cline-db.git
+tasksync init --provider cline https://github.com/your/private-repo.git
 ```
 
-**4. On additional machines:**
+Supported providers: `cline` Â· `roo` Â· `kilo` Â· `openclaw`
+
+If multiple storage roots are detected (for example VS Code + VS Code Server), you will be prompted to select one.
+
+### Sync State
 
 ```bash
-TaskSync init git@github.com:YOUR_USERNAME/my-cline-db.git
+tasksync sync --provider cline
 ```
 
-**5. Sync anytime:**
+Performs:
+
+- `git pull --rebase`
+- Stage changes
+- Commit if needed
+- Push
+- Update manifest timestamp
+
+### Status
 
 ```bash
-TaskSync sync
+tasksync status --provider cline
 ```
 
-> **Note:** PATs are never stored in git remote URLs or config files. They are passed ephemerally via `GIT_ASKPASS` for a single command, then discarded. SSH is the recommended auth method.
+Displays:
+
+- Provider
+- Root path
+- Workspace ID
+- Machine ID
+- Remote configuration
+- Last sync time
+- Uncommitted changes
+
+### Dashboard
+
+```bash
+tasksync dashboard
+```
+
+Launches a local dashboard at:
+
+```
+http://127.0.0.1:3210
+```
+
+The dashboard allows you to:
+
+- View sessions/tasks per provider
+- Trigger manual sync
+- Drag & drop tasks between providers (explicit migration only)
 
 ---
 
-## What Gets Synced
+## Sync vs Migration
 
-**Synced:**
+### Sync
 
-* `tasks/`
-* workspace state
-* `globalState.json`
-* checkpoints
-* `.TaskSync_manifest.json`
+Sync keeps the same provider consistent across machines.
 
-**Excluded:**
+| âœ“ Valid sync pairs |
+|--------------------|
+| Cline â†” Cline      |
+| Roo â†” Roo          |
+| Kilo â†” Kilo        |
+| OpenClaw â†” OpenClaw|
 
-* `secrets.json`
-* `cache/`, `temp/`, `logs/`
-* puppeteer / browser binaries
-* `*.log`, `*.token`, `*.auth`
-* `node_modules/`, `.DS_Store`
+Sync never merges different providers automatically.
 
-The exclusion list is automatically maintained under:
+### Migration
 
+Migration is manual and explicit. Using the dashboard, you can drag a task from one provider to another. This creates an imported task in the target provider.
+
+- No automatic merging
+- No folder mixing
+- Provenance is preserved
+
+---
+
+## Provider Data Locations
+
+### Cline
+
+**macOS:**
 ```
-~/.cline/data/.gitignore
+~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev
+```
+
+**Linux:**
+```
+~/.config/Code/User/globalStorage/saoudrizwan.claude-dev
+```
+
+**Windows:**
+```
+%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev
+```
+
+**Override:**
+```bash
+CLINE_DIR=/custom/path
+```
+
+### Roo Code
+
+**macOS:**
+```
+~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline
+```
+
+**Linux:**
+```
+~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline
+```
+
+**Windows:**
+```
+%APPDATA%\Code\User\globalStorage\rooveterinaryinc.roo-cline
+```
+
+**Override:**
+```bash
+ROO_DIR=/custom/path
+```
+
+### Kilo Code
+
+**macOS:**
+```
+~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code
+```
+
+**Linux:**
+```
+~/.config/Code/User/globalStorage/kilocode.kilo-code
+```
+
+**Windows:**
+```
+%APPDATA%\Code\User\globalStorage\kilocode.kilo-code
+```
+
+**Override:**
+```bash
+KILO_DIR=/custom/path
+```
+
+### OpenClaw
+
+**Default:**
+```
+~/.openclaw
+```
+
+Includes: `workspace/`, `agents/*/sessions/`, `openclaw.json`
+
+**Overrides:**
+```bash
+OPENCLAW_DIR=/custom/path
+OPENCLAW_WORKSPACE=/custom/workspace
 ```
 
 ---
 
 ## Identity Model
 
-**Machine ID**
-Stored locally in `~/.TaskSync/config.json`
-Never synced.
+TaskSync separates identity into:
 
-**Workspace ID**
-Stored in `~/.cline/data/.TaskSync_manifest.json`
-Synced across machines.
+**Machine Identity** â€” stored locally, never committed:
+```
+~/.tasksync/config.json
+```
 
-Machine identity ? Workspace identity.
+**Workspace Identity** â€” stored in the repo root, synced via Git:
+```
+.tasksync_manifest.json
+```
 
-This separation enables deterministic merges and future collaborative models.
+Machine ID is never committed. Workspace ID is synced via Git.
 
 ---
 
-## Canonical Architecture (Conceptual)
+## Safety
 
-```
-Machine
-?
-Provider Adapter
-?
-Canonical Task Graph
-?
-Materializer
-?
-Target Provider
-```
+TaskSync excludes:
 
-All state changes flow through the canonical graph.
+- Secret and token files
+- Logs and cache directories
+- Large binaries (>50 MB warning)
 
-This is the foundation for:
-
-* Task envelopes
-* Redacted context packs
-* Fork / merge semantics
-* Multi-agent orchestration
-* Cloud task addressing
-
----
-
-## Security Model
-
-* No hosted backend, no telemetry, no data proxying
-* Git commands use `execFile` (no shell) — immune to injection
-* Credentials never stored in git config or remote URLs (ephemeral `GIT_ASKPASS`)
-* Dashboard mutation APIs require a per-session auth token (auto-injected, invisible to user)
-* All filesystem operations enforce centralized path traversal guards
-* Error messages are redacted before API exposure (no credential leakage)
-
-You own the repository, the remote, the authentication, and the encryption strategy.
-
-TaskSync operates entirely within your trust boundary.
-
-See [SECURITY.md](SECURITY.md) for the full security policy.
-
-## Schema Governance
-
-TaskSync currently operates with two version domains:
-
-1. Canonical run-store schema (`CANONICAL_SCHEMA_VERSION`)
-2. Provider manifest schema (`.TaskSync_manifest.json` `schemaVersion` via provider `getSchemaVersion()`)
-
-The canonical schema is versioned and governed by an explicit compatibility contract.
-
-See [docs/SCHEMA_COMPATIBILITY.md](docs/SCHEMA_COMPATIBILITY.md) for:
-* What changes require a version increment
-* Backward compatibility guarantees
-* Migration requirements and upgrade path
-* End-to-end compatibility matrix across CLI/dashboard/API flows
-* Canonical DB rebuild/recovery contract (`TaskSync canonical reconcile`)
-
----
-
-## Troubleshooting
-
-**Merge conflict during sync:**
-
-Resolve conflict markers in `~/.cline/data`, then run:
-
-```bash
-git add .
-git rebase --continue
-TaskSync sync
-```
-
-**Authentication failed:**
-
-Ensure PAT has `repo` scope and re-run `TaskSync init`.
-
-**Cline directory missing:**
-
-Ensure Cline has been run at least once, or override the path:
-
-```bash
-CLINE_DIR=/custom/path TaskSync status
-```
+It does not send your data to any external service.
 
 ---
 
 ## Roadmap
 
-| Version | Status |
-|---------|--------|
-| v0.2.0 — Multi-provider support (Cline, Roo, Kilo, OpenClaw) | ? Complete |
-| v0.3.0 — Encrypted hosted sync backend (optional) | ?? Planned |
-| v0.4.0 — Unified Task object, Fork/merge semantics, Task envelopes, Cloud-addressable tasks | ?? Planned |
-
----
-
-## Vision
-
-TaskSync is Phase 1 of a larger system:
-
-```
-TaskSync ? Canonical Task Layer ? Agents Cloud
-```
-
-Where:
-
-* Tasks are first-class objects
-* Context is structured and portable
-* AI execution is versioned
-* Collaboration is explicit
-* Model alignment becomes programmable
-
-We believe agentic systems need real state infrastructure.
-
-**TaskSync is that layer.**
+- Improved native task migration
+- Optional encrypted sync
+- Cross-provider task search
+- Binary builds
+- Cursor support
