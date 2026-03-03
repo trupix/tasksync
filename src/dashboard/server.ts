@@ -124,6 +124,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
         label: r.label,
         path: r.path,
         isInitialized: p.validateRoot(r.path),
+        syncInitialized: !!readManifest(r.path),
       }))
     }));
     res.json({ providers: result });
@@ -362,6 +363,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
           .auth-banner { display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:6px; font-size:12px; margin-bottom:16px; cursor:pointer; border:1px solid transparent; transition:opacity .15s; user-select:none; }
           .auth-banner:hover { opacity:.85; }
           .auth-ok { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+          .auth-info { background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
           .auth-warn { background:#fef9c3; color:#854d0e; border-color:#fde68a; }
           /* Auth modal extras */
           .auth-modal .modal { max-width:460px; }
@@ -487,6 +489,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
           let allTasks = new Map();
           let currentModalTask = null;
           let authState = null;
+          let hasSyncSetup = false;
 
           // ── Auth banner & modal ─────────────────────────────────────────────
 
@@ -504,11 +507,18 @@ export async function startDashboard(port: number, openBrowser: boolean) {
             const icon = document.getElementById('authBannerIcon');
             const text = document.getElementById('authBannerText');
             if (!banner) return;
-            if (authState && authState.authenticated) {
+            if (authState && authState.authenticated && hasSyncSetup) {
+              // State 3: authenticated + sync initialized → green
               banner.className = 'auth-banner auth-ok';
               icon.textContent = '✓';
               text.textContent = 'Authenticated as @' + (authState.username || 'user') + (authState.maskedToken ? ' · ' + authState.maskedToken : '') + ' — click to manage';
+            } else if (authState && authState.authenticated && !hasSyncSetup) {
+              // State 2: authenticated but no sync repo set up → blue
+              banner.className = 'auth-banner auth-info';
+              icon.textContent = '🔗';
+              text.textContent = 'Authenticated as @' + (authState.username || 'user') + ' — no sync repo connected yet · click to connect';
             } else {
+              // State 1: no authentication → amber
               banner.className = 'auth-banner auth-warn';
               icon.textContent = '⚠';
               text.textContent = 'No authentication configured — click to set up';
@@ -774,6 +784,9 @@ export async function startDashboard(port: number, openBrowser: boolean) {
             allTasks.clear();
             const res = await fetch('/api/providers');
             const { providers } = await res.json();
+            // Update banner: check if any provider root has sync initialized
+            hasSyncSetup = providers.some(function(p) { return p.roots.some(function(r) { return r.syncInitialized; }); });
+            renderAuthBanner();
             board.innerHTML = '';
             const togglesEl = document.getElementById('columnToggles');
             togglesEl.innerHTML = '<span style="font-weight:600;">Columns:</span> ';
