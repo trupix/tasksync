@@ -276,3 +276,7 @@ It does not send your data to any external service.
 - Cross-provider task search
 - Binary builds
 - Cursor support
+
+---
+
+TaskSync is open source under the MIT License.
