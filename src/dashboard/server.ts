@@ -649,7 +649,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
 
             let cloneUrl;
             if (checkData.exists) {
-              const use = confirm('A repo named "' + repoName + '" already exists on @' + checkData.username + '.\n\nUse it for sync? (OK = use it, Cancel = pick a different name)');
+              const use = confirm('A repo named "' + repoName + '" already exists on @' + checkData.username + '.\\n\\nUse it for sync? (OK = use it, Cancel = pick a different name)');
               if (!use) { msgEl.style.display = 'none'; document.getElementById('repoNameInput').focus(); return; }
               cloneUrl = 'https://github.com/' + checkData.username + '/' + repoName + '.git';
               msgEl.textContent = 'Using existing repository...';
