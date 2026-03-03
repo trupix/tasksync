@@ -4,6 +4,8 @@ Portable AI session sync for Cline, Roo, Kilo, and OpenClaw.
 
 TaskSync keeps your AI coding sessions consistent across machines using Git as a private backend.
 
+AI coding sessions are stateful. Your infrastructure should be too.
+
 Start a session on your work machine. Continue it on your laptop.  
 No hosted servers. No background daemons. Just your repo.
 
@@ -47,7 +49,7 @@ npm install
 npm run build
 ```
 
-You can then run the CLI directly:
+Run the CLI directly:
 
 ```bash
 node build/cli.js <command>
@@ -57,11 +59,6 @@ Or link it globally for development:
 
 ```bash
 npm link
-```
-
-Then:
-
-```bash
 tasksync <command>
 ```
 
@@ -88,7 +85,7 @@ tasksync sync --provider cline
 Performs:
 
 - `git pull --rebase`
-- Stage changes
+- Stage local changes
 - Commit if needed
 - Push
 - Update manifest timestamp
@@ -121,7 +118,9 @@ Launches a local dashboard at:
 http://127.0.0.1:3210
 ```
 
-The dashboard allows you to:
+The dashboard binds to `127.0.0.1` only. It does not expose a public port and is not accessible from other machines or the network.
+
+From the dashboard you can:
 
 - View sessions/tasks per provider
 - Trigger manual sync
@@ -133,23 +132,24 @@ The dashboard allows you to:
 
 ### Sync
 
-Sync keeps the same provider consistent across machines.
+Sync keeps the same provider consistent across machines. **Providers are never automatically merged.** Running `tasksync sync --provider cline` syncs only Cline data — Roo, Kilo, and OpenClaw are unaffected.
 
-| ✓ Valid sync pairs |
-|--------------------|
-| Cline ↔ Cline      |
-| Roo ↔ Roo          |
-| Kilo ↔ Kilo        |
-| OpenClaw ↔ OpenClaw|
+| Valid sync pairs    |
+|---------------------|
+| Cline ↔ Cline       |
+| Roo ↔ Roo           |
+| Kilo ↔ Kilo         |
+| OpenClaw ↔ OpenClaw |
 
-Sync never merges different providers automatically.
+Cross-provider sync is not supported.
 
 ### Migration
 
-Migration is manual and explicit. Using the dashboard, you can drag a task from one provider to another. This creates an imported task in the target provider.
+Migration is manual and explicit. From the dashboard, drag a task from one provider to another. This creates a copy in the target provider with its provenance recorded.
 
 - No automatic merging
 - No folder mixing
+- Original task remains in the source provider
 - Provenance is preserved
 
 ---
@@ -241,16 +241,16 @@ OPENCLAW_WORKSPACE=/custom/workspace
 
 ## Identity Model
 
-TaskSync separates identity into:
+TaskSync separates identity into two layers:
 
 **Machine Identity** — stored locally, never committed:
 ```
-~/.tasksync/config.json
+~/.TaskSync/config.json
 ```
 
 **Workspace Identity** — stored in the repo root, synced via Git:
 ```
-.tasksync_manifest.json
+.TaskSync_manifest.json
 ```
 
 Machine ID is never committed. Workspace ID is synced via Git.
