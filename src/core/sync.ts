@@ -244,11 +244,27 @@ export async function runUnifiedSync(
     );
   }
 
-  // 1. Pull latest
+  // 1. Snapshot local → staging and commit (ensures working tree is clean before pull)
+  for (const { provider, root } of targets) {
+    const name = provider.getProviderName();
+    const subfolder = path.join(syncRepoPath, name);
+    console.log(`  Snapshotting ${name} to repo...`);
+    copyLocalToRepo(root.path, subfolder);
+  }
+
+  await addAll(syncRepoPath);
+  const preCommitted = await commit(syncRepoPath, "TaskSync: sync (pre-pull snapshot)");
+  if (preCommitted) {
+    console.log("  Local changes committed.");
+  } else {
+    console.log("  No local changes — working tree clean.");
+  }
+
+  // 2. Pull latest (working tree is now clean)
   console.log("  Pulling remote changes...");
   await withRetry("pull", () => pullRebase(syncRepoPath, pat));
 
-  // 2. Apply repo → local (merge: no deletes, preserves local-only files)
+  // 3. Apply repo → local (merge pulled changes into provider data dirs)
   for (const { provider, root } of targets) {
     const name = provider.getProviderName();
     const subfolder = path.join(syncRepoPath, name);
@@ -258,23 +274,7 @@ export async function runUnifiedSync(
     }
   }
 
-  // 3. Copy local → repo (mirror: full snapshot of current local state)
-  for (const { provider, root } of targets) {
-    const name = provider.getProviderName();
-    const subfolder = path.join(syncRepoPath, name);
-    console.log(`  Snapshotting ${name} to repo...`);
-    copyLocalToRepo(root.path, subfolder);
-  }
-
-  // 4. Commit and push
-  await addAll(syncRepoPath);
-  const committed = await commit(syncRepoPath, "TaskSync: sync");
-  if (committed) {
-    console.log("  Local changes committed.");
-  } else {
-    console.log("  No local changes to commit.");
-  }
-
+  // 4. Push
   console.log("  Pushing to remote...");
   await withRetry("push", () => push(syncRepoPath, pat));
 
