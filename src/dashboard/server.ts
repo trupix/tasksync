@@ -145,14 +145,26 @@ export async function startDashboard(port: number, openBrowser: boolean) {
   app.post("/api/init", requireAuth, async (req, res) => {
     try {
       const { provider, rootId, repoUrl, pat } = req.body;
-      if (!isValidProvider(provider)) return void safeErr(res, 400, "Invalid provider");
-      if (!isValidRootId(rootId)) return void safeErr(res, 400, "Invalid rootId");
       if (typeof repoUrl !== "string" || !repoUrl.startsWith("http")) return void safeErr(res, 400, "Invalid repoUrl");
-      const p = getProvider(provider);
-      const r = getRoot(p, rootId);
-      // Use unified model: one central repo with provider subfolders
-      await runUnifiedInit([{ provider: p, root: r }], { repoUrl, pat });
-      res.json({ success: true });
+
+      // Build targets: if provider/rootId given, use just that one; otherwise detect all installed
+      let targets: { provider: IProvider; root: ProviderRoot }[];
+      if (provider && rootId) {
+        if (!isValidProvider(provider)) return void safeErr(res, 400, "Invalid provider");
+        if (!isValidRootId(rootId)) return void safeErr(res, 400, "Invalid rootId");
+        const p = getProvider(provider);
+        const r = getRoot(p, rootId);
+        targets = [{ provider: p, root: r }];
+      } else {
+        // Detect all installed providers
+        targets = providers
+          .flatMap(p => p.getRoots().map(r => ({ provider: p, root: r })))
+          .filter(({ provider: p, root: r }) => p.validateRoot(r.path));
+        if (targets.length === 0) return void safeErr(res, 400, "No providers detected on this machine");
+      }
+
+      await runUnifiedInit(targets, { repoUrl, pat });
+      res.json({ success: true, providers: targets.map(t => t.provider.getProviderName()) });
     } catch (e: any) {
       safeErr(res, 500, e.message);
     }
@@ -373,12 +385,12 @@ export async function startDashboard(port: number, openBrowser: boolean) {
           .toast-error { background: #dc2626; }
           @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
           @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-          /* Auth banner */
-          .auth-banner { display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:6px; font-size:12px; margin-bottom:16px; cursor:pointer; border:1px solid transparent; transition:opacity .15s; user-select:none; }
-          .auth-banner:hover { opacity:.85; }
-          .auth-ok { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
-          .auth-info { background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
-          .auth-warn { background:#fef9c3; color:#854d0e; border-color:#fde68a; }
+          /* Auth button (inline in header) */
+          .auth-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:4px; border:1px solid transparent; cursor:pointer; font-size:12px; font-weight:500; transition:filter .1s; background:none; }
+          .auth-btn:hover { filter:brightness(0.93); }
+          .auth-btn-ok { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+          .auth-btn-info { background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
+          .auth-btn-warn { background:#fef9c3; color:#854d0e; border-color:#fde68a; }
           /* Auth modal extras */
           .auth-modal .modal { max-width:460px; }
           .tab-row { display:flex; border:1px solid #e4e4e7; border-radius:6px; overflow:hidden; margin-bottom:16px; }
@@ -401,13 +413,13 @@ export async function startDashboard(port: number, openBrowser: boolean) {
             <div style="width:36px; height:36px; flex-shrink:0;">${LOGO_SVG}</div>
             <h1 style="margin:0">TaskSync</h1>
           </div>
-          <button class="btn" onclick="load()" style="padding:8px 16px; font-size:14px; display:inline-flex; align-items:center; gap:6px;">${ICON_REFRESH} Refresh Tasks</button>
-        </div>
-
-        <!-- Auth status banner -->
-        <div id="authBanner" class="auth-banner auth-warn" onclick="openAuthModal()">
-          <span id="authBannerIcon">⚠</span>
-          <span id="authBannerText">No authentication configured — click to set up</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="authBanner" class="auth-btn auth-btn-warn" onclick="openAuthModal()">
+              <span id="authBannerIcon">⚠</span>
+              <span id="authBannerText">Set up auth</span>
+            </button>
+            <button class="btn" onclick="load()" style="padding:8px 16px; font-size:14px; display:inline-flex; align-items:center; gap:6px;">${ICON_REFRESH} Refresh Tasks</button>
+          </div>
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
@@ -456,11 +468,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
                   <div class="modal-section">
                     <label class="field-label">Repository name</label>
                     <input id="repoNameInput" type="text" value="tasksync-data" class="field-input" />
-                    <div style="font-size:11px;color:#71717a;margin-top:4px;">Will be created as a private repo on your GitHub account.</div>
-                  </div>
-                  <div class="modal-section">
-                    <label class="field-label">Provider to initialize</label>
-                    <select id="createProviderSelect" class="field-input"></select>
+                    <div style="font-size:11px;color:#71717a;margin-top:4px;">Created as a private repo — all detected providers will sync into subfolders.</div>
                   </div>
                   <div id="createMsg" style="display:none;" class="msg-spin"></div>
                   <button class="btn" onclick="createAndInit()" style="width:100%;padding:10px;">Create repo &amp; initialize sync</button>
@@ -471,10 +479,7 @@ export async function startDashboard(port: number, openBrowser: boolean) {
                   <div class="modal-section">
                     <label class="field-label">Repository URL</label>
                     <input id="existingRepoUrl" type="text" placeholder="https://github.com/you/repo.git" class="field-input" />
-                  </div>
-                  <div class="modal-section">
-                    <label class="field-label">Provider to initialize</label>
-                    <select id="existingProviderSelect" class="field-input"></select>
+                    <div style="font-size:11px;color:#71717a;margin-top:4px;">All detected providers will sync into subfolders of this repo.</div>
                   </div>
                   <div id="existingMsg" style="display:none;" class="msg-spin"></div>
                   <button class="btn" onclick="initExisting()" style="width:100%;padding:10px;">Initialize sync</button>
@@ -512,7 +517,6 @@ export async function startDashboard(port: number, openBrowser: boolean) {
               const res = await fetch('/api/auth/status');
               authState = await res.json();
               renderAuthBanner();
-              if (authState && authState.authenticated) populateProviderSelects();
             } catch(e) { /* ignore */ }
           }
 
@@ -522,20 +526,20 @@ export async function startDashboard(port: number, openBrowser: boolean) {
             const text = document.getElementById('authBannerText');
             if (!banner) return;
             if (authState && authState.authenticated && hasSyncSetup) {
-              // State 3: authenticated + sync initialized → green
-              banner.className = 'auth-banner auth-ok';
-              icon.textContent = '✓';
-              text.textContent = 'Authenticated as @' + (authState.username || 'user') + (authState.maskedToken ? ' · ' + authState.maskedToken : '') + ' — click to manage';
+              // State 3: authenticated + sync ready → compact green button
+              banner.className = 'auth-btn auth-btn-ok';
+              icon.textContent = '\u2713';
+              text.textContent = 'Authenticated';
             } else if (authState && authState.authenticated && !hasSyncSetup) {
-              // State 2: authenticated but no sync repo set up -> blue
-              banner.className = 'auth-banner auth-info';
+              // State 2: authenticated but no repo → compact blue button
+              banner.className = 'auth-btn auth-btn-info';
               icon.textContent = '\u2192';
-              text.textContent = 'Authenticated as @' + (authState.username || 'user') + ' \u2014 no sync repo connected yet \u00b7 click to connect';
+              text.textContent = 'Connect repo';
             } else {
-              // State 1: no authentication → amber
-              banner.className = 'auth-banner auth-warn';
-              icon.textContent = '⚠';
-              text.textContent = 'No authentication configured — click to set up';
+              // State 1: no authentication → compact amber button
+              banner.className = 'auth-btn auth-btn-warn';
+              icon.textContent = '\u26a0';
+              text.textContent = 'Set up auth';
             }
           }
 
@@ -565,7 +569,6 @@ export async function startDashboard(port: number, openBrowser: boolean) {
                 + '</div>';
               connectSection.style.display = 'block';
               removeRow.style.display = 'block';
-              populateProviderSelects();
             } else {
               statusDiv.innerHTML = '';
               connectSection.style.display = 'none';
@@ -624,25 +627,9 @@ export async function startDashboard(port: number, openBrowser: boolean) {
             document.getElementById('tabExisting').className = 'tab-btn ' + (isCreate ? 'tab-inactive' : 'tab-active');
           }
 
-          function populateProviderSelects() {
-            fetch('/api/providers').then(r => r.json()).then(function(d) {
-              const opts = d.providers.flatMap(function(p) {
-                return p.roots.map(function(r) {
-                  return '<option value="' + p.name + '|' + r.id + '">' + p.name + ' (' + r.label + ')</option>';
-                });
-              }).join('');
-              const html = opts || '<option value="">No providers detected</option>';
-              document.getElementById('createProviderSelect').innerHTML = html;
-              document.getElementById('existingProviderSelect').innerHTML = html;
-            }).catch(function(){});
-          }
-
           async function createAndInit() {
             const repoName = document.getElementById('repoNameInput').value.trim();
-            const providerVal = document.getElementById('createProviderSelect').value;
             if (!repoName) { alert('Please enter a repo name'); return; }
-            if (!providerVal) { alert('Please select a provider'); return; }
-            const [providerName, rootId] = providerVal.split('|');
             const msgEl = document.getElementById('createMsg');
             msgEl.style.display = 'block'; msgEl.className = 'msg-spin'; msgEl.textContent = 'Checking repository name...';
 
@@ -678,16 +665,16 @@ export async function startDashboard(port: number, openBrowser: boolean) {
               } catch(e) { msgEl.className = 'msg-err'; msgEl.textContent = 'Error: ' + e.message; return; }
             }
 
-            // 3. Init
+            // 3. Init all detected providers
             try {
               const r = await fetch('/api/init', {
                 method: 'POST', headers: authHeaders({'Content-Type':'application/json'}),
-                body: JSON.stringify({ provider: providerName, rootId, repoUrl: cloneUrl })
+                body: JSON.stringify({ repoUrl: cloneUrl })
               });
               const d = await r.json();
               if (d.success) {
-                msgEl.className = 'msg-ok'; msgEl.textContent = '✓ Sync initialized! ' + cloneUrl;
-                toast('✓ Sync initialized for ' + providerName);
+                toast('\u2713 Sync initialized');
+                closeAuthModal();
                 load();
               } else { msgEl.className = 'msg-err'; msgEl.textContent = d.error || 'Initialization failed'; }
             } catch(e) { msgEl.className = 'msg-err'; msgEl.textContent = 'Error: ' + e.message; }
@@ -695,20 +682,17 @@ export async function startDashboard(port: number, openBrowser: boolean) {
 
           async function initExisting() {
             const repoUrl = document.getElementById('existingRepoUrl').value.trim();
-            const providerVal = document.getElementById('existingProviderSelect').value;
             if (!repoUrl) { alert('Please enter a repository URL'); return; }
-            if (!providerVal) { alert('Please select a provider'); return; }
             if (!repoUrl.startsWith('http') && !repoUrl.startsWith('git@')) { alert('Please enter a valid URL (https:// or git@)'); return; }
-            const [providerName, rootId] = providerVal.split('|');
             const msgEl = document.getElementById('existingMsg');
             msgEl.style.display = 'block'; msgEl.className = 'msg-spin'; msgEl.textContent = 'Initializing sync...';
             try {
               const r = await fetch('/api/init', {
                 method: 'POST', headers: authHeaders({'Content-Type':'application/json'}),
-                body: JSON.stringify({ provider: providerName, rootId, repoUrl })
+                body: JSON.stringify({ repoUrl })
               });
               const d = await r.json();
-              if (d.success) { msgEl.className = 'msg-ok'; msgEl.textContent = '✓ Sync initialized!'; toast('✓ Sync initialized for ' + providerName); load(); }
+              if (d.success) { toast('\u2713 Sync initialized'); closeAuthModal(); load(); }
               else { msgEl.className = 'msg-err'; msgEl.textContent = d.error || 'Initialization failed'; }
             } catch(e) { msgEl.className = 'msg-err'; msgEl.textContent = 'Error: ' + e.message; }
           }
