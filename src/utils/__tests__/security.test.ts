@@ -1,4 +1,5 @@
 import assert from "assert";
+import path from "path";
 import { redactTokens, redactUrl, isValidProvider, isValidId, isValidRunId, isValidRootId, isPathSafe, safePath, PathTraversalError, clampLimit, getDashboardToken, verifyDashboardToken } from "../security";
 
 let passed = 0;
@@ -112,8 +113,9 @@ test("isPathSafe: rejects traversal escape", () => {
 // ─── safePath tests ──────────────────────────────────────────────────────────
 
 test("safePath: resolves valid child path", () => {
-  const result = safePath("/home/user/data", "tasks/abc123");
-  assert.ok(result.startsWith("/home/user/data/"));
+  const parent = path.resolve("/home/user/data");
+  const result = safePath(parent, "tasks/abc123");
+  assert.ok(result.startsWith(parent + path.sep));
   assert.ok(result.includes("abc123"));
 });
 
@@ -134,8 +136,9 @@ test("safePath: throws on backslash injection", () => {
 });
 
 test("safePath: allows normal nested paths", () => {
-  const result = safePath("/data", "tasks/subtask/file.json");
-  assert.ok(result.startsWith("/data/"));
+  const parent = path.resolve("/data");
+  const result = safePath(parent, "tasks/subtask/file.json");
+  assert.ok(result.startsWith(parent + path.sep));
 });
 
 // ─── clampLimit tests ────────────────────────────────────────────────────────

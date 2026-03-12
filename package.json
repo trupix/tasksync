@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node build/cli.js",
-    "test": "npx tsx src/utils/__tests__/security.test.ts && npx tsx src/utils/__tests__/git-injection.test.ts && npx tsx src/core/tasks/__tests__/migration.test.ts"
+    "test": "npx tsx src/utils/__tests__/security.test.ts && npx tsx src/utils/__tests__/git-injection.test.ts && npx tsx src/core/tasks/__tests__/migration.test.ts && npx tsx src/mcp/__tests__/mcp.test.ts"
   },
   "keywords": [
     "cline",
@@ -23,6 +23,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^13.1.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",

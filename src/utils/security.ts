@@ -65,8 +65,8 @@ export function redactUrl(url: string): string {
  * Normalizes paths first to catch `..` components.
  */
 export function isPathSafe(parentDir: string, resolvedPath: string): boolean {
-  const normalParent = path.normalize(parentDir);
-  const normalResolved = path.normalize(resolvedPath);
+  const normalParent = path.resolve(parentDir);
+  const normalResolved = path.resolve(resolvedPath);
   const withSep = normalParent.endsWith(path.sep) ? normalParent : normalParent + path.sep;
   return normalResolved.startsWith(withSep) || normalResolved === normalParent;
 }
@@ -74,7 +74,7 @@ export function isPathSafe(parentDir: string, resolvedPath: string): boolean {
 /**
  * Resolve a child path safely under a parent directory.
  * Throws if the resulting path escapes the parent (traversal attempt).
- * This is the centralized entrypoint — all filesystem mutations must use this.
+ * This is the centralized entrypoint ï¿½ all filesystem mutations must use this.
  */
 export function safePath(parentDir: string, childSegment: string): string {
   // Reject null bytes immediately

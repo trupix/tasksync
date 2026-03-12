@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { IProvider, ProviderRoot } from "../../providers/interface";
+import { listCapturedTasks } from "./captured";
 
 // --- Workspace extraction from API conversation history ----------------------
 
@@ -23,12 +24,12 @@ interface WorkspaceDetails {
  * Extract workspace details from a Cline task's api_conversation_history.json.
  *
  * Cline embeds two useful blocks in the first user message:
- * - `Current Working Directory (/path/to/project)` — the CWD
- * - `# Workspace Configuration { ... }` — hint, git remotes, commit hash
+ * - `Current Working Directory (/path/to/project)` ï¿½ the CWD
+ * - `# Workspace Configuration { ... }` ï¿½ hint, git remotes, commit hash
  *
  * Returns a WorkspaceDetails object with whatever was found.
  */
-function extractWorkspaceDetails(taskPath: string): WorkspaceDetails {
+export function extractWorkspaceDetails(taskPath: string): WorkspaceDetails {
   const apiHistoryPath = path.join(taskPath, "api_conversation_history.json");
   const details: WorkspaceDetails = {};
   if (!fs.existsSync(apiHistoryPath)) return details;
@@ -89,7 +90,7 @@ function extractWorkspaceDetails(taskPath: string): WorkspaceDetails {
                   }
                 }
               } catch {
-                // JSON parse failed — skip
+                // JSON parse failed ï¿½ skip
               }
             }
           }
@@ -100,7 +101,7 @@ function extractWorkspaceDetails(taskPath: string): WorkspaceDetails {
       if (details.cwd && details.hint) break;
     }
   } catch {
-    // Ignore parse errors — file may be corrupted or very large
+    // Ignore parse errors ï¿½ file may be corrupted or very large
   }
 
   return details;
@@ -221,6 +222,22 @@ export function getTasksForRoot(provider: IProvider, root: ProviderRoot): TaskSu
   // OpenClaw uses JSONL sessions, not Cline-style tasks/ directories
   if (provider.getProviderName() === "openclaw") {
     return getOpenClawTasks(provider, root);
+  }
+
+  // Captured tasks are stored in TaskSync-owned storage (~/.TaskSync/captured/)
+  if (provider.getProviderName() === "captured") {
+    return listCapturedTasks().map((record) => ({
+      taskId: record.id,
+      title: record.title,
+      updatedAt: record.updatedAt,
+      status: "captured",
+      workspace: record.workspacePath,
+      origin: {
+        provider: "captured",
+        rootId: root.id,
+        rootLabel: root.label,
+      },
+    }));
   }
 
   const tasksDir = path.join(root.path, "tasks");

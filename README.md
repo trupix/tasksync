@@ -1,6 +1,6 @@
 # TaskSync
 
-Portable AI session sync for Cline, Roo, Kilo, and OpenClaw.
+Portable AI session sync for Cline, Roo Code, and OpenClaw.
 
 TaskSync keeps your AI coding sessions consistent across machines using Git as a private backend.
 
@@ -15,16 +15,21 @@ No hosted servers. No background daemons. Just your repo.
 
 TaskSync synchronizes AI assistant state across machines.
 
-**Supported providers:**
+**Currently supported providers:**
 
 - Cline
 - Roo Code
-- Kilo Code
 - OpenClaw
+
+**Temporarily unsupported:**
+
+- Kilo Code — Kilo's storage model is currently too version-specific and unstable for TaskSync to support reliably. Kilo v5 depends on extension-managed/private state beyond simple file mirroring, and Kilo v6 moved to a different SQLite-backed architecture. Because TaskSync is open source, contributions are welcome if someone finds a clean, durable integration path.
 
 Each provider is synced independently to prevent UI conflicts or state corruption.
 
 TaskSync also includes a local dashboard for viewing sessions across providers and manually migrating tasks between them.
+
+TaskSync can also run as a local MCP server — a **bi-directional context hub** — so MCP-capable assistants can both retrieve prior task context and push new context back into TaskSync. This means you can capture work done in Cursor, Claude Desktop, Windsurf, or any MCP-capable tool, store it in TaskSync, and continue it in any other tool.
 
 ---
 
@@ -35,6 +40,8 @@ TaskSync also includes a local dashboard for viewing sessions across providers a
 - No cloud dependency
 - No auto-merging across tools
 - Explicit cross-tool migration only
+- MCP as an additional context bridge interface, not a replacement for the CLI
+- `capture_context` is the only MCP write operation — it writes exclusively to TaskSync-owned storage and never mutates provider-native stores
 
 ---
 
@@ -62,6 +69,7 @@ Run the CLI directly:
 ```bash
 node build/cli.js setup
 node build/cli.js dashboard
+node build/cli.js mcp
 node build/cli.js --help
 ```
 
@@ -71,6 +79,7 @@ Or link it globally for development:
 npm link
 tasksync setup
 tasksync dashboard
+tasksync mcp
 tasksync --help
 ```
 
@@ -117,7 +126,7 @@ tasksync init https://github.com/username/my-ai-sync.git
 tasksync sync
 ```
 
-**Supported providers:** `cline` · `roo` · `kilo` · `openclaw`
+**Supported providers:** `cline` · `roo` · `openclaw`
 
 If multiple storage roots are detected (e.g., VS Code + VS Code Server), you will be prompted to select one.
 
@@ -145,7 +154,7 @@ Launches at `http://127.0.0.1:3210` (localhost only, not network-accessible)
 Dashboard features:
 - View sessions/tasks per provider
 - Trigger manual sync
-- Drag & drop tasks between providers (explicit migration only)
+- Drag & drop tasks between supported providers (explicit migration only)
 - Edit task workspace paths
 - Manage GitHub authentication
 
@@ -155,14 +164,14 @@ Dashboard features:
 
 ### Main Commands
 
-#### `tasksync setup`
+### `tasksync setup`
 Guided first-time setup wizard. Detects providers, sets up authentication, and connects to a sync repository.
 
 ```bash
 tasksync setup
 ```
 
-#### `tasksync init <repoUrl>`
+### `tasksync init <repoUrl>`
 Initialize sync with a GitHub repository.
 
 ```bash
@@ -177,10 +186,10 @@ tasksync init --pat ghp_yourtoken https://github.com/username/repo.git
 ```
 
 **Options:**
-- `--provider <name>` — Limit initialization to specific provider (cline, roo, kilo, openclaw)
+- `--provider <name>` — Limit initialization to specific provider (cline, roo, openclaw)
 - `--pat <token>` — GitHub Personal Access Token (alternative to `tasksync auth`)
 
-#### `tasksync sync`
+### `tasksync sync`
 Pull remote changes and push local changes.
 
 ```bash
@@ -201,7 +210,7 @@ Performs:
 - `git push` (upload local changes)
 - Update manifest timestamp
 
-#### `tasksync status`
+### `tasksync status`
 Show sync configuration and status for all providers.
 
 ```bash
@@ -216,7 +225,7 @@ Displays:
 - Last sync time per provider
 - Uncommitted changes
 
-#### `tasksync dashboard`
+### `tasksync dashboard`
 Launch the local web dashboard.
 
 ```bash
@@ -234,9 +243,223 @@ tasksync dashboard --no-open
 - `--port <number>` — Port to run dashboard on (default: 3210)
 - `--no-open` — Don't automatically open browser
 
+### `tasksync mcp`
+Run the local TaskSync MCP server over stdio.
+
+```bash
+tasksync mcp
+```
+
+This starts a local MCP endpoint for MCP-capable assistants. It supports:
+- discovering prior TaskSync tasks across all providers
+- retrieving summaries, transcripts, and workspace context
+- building continuation packets for cross-assistant rehydration
+- **capturing context from any MCP-capable tool** into TaskSync-owned storage
+
+The MCP server is intentionally:
+- local-first (no network listener, no daemon)
+- provider-agnostic at the tool surface
+- `capture_context` is the only write operation — never mutates provider-native stores
+- not a native session injector for Cursor or any other host app
+
+### `tasksync mcp install`
+
+Automatically write the TaskSync MCP server configuration into a supported AI tool's config file.
+
+```bash
+# Install for all detected clients
+tasksync mcp install
+
+# Install for a specific client
+tasksync mcp install --client cursor
+tasksync mcp install --client claude-desktop
+tasksync mcp install --client windsurf
+```
+
+Supported clients: `cursor`, `claude-desktop`, `windsurf`
+
+Config file locations:
+
+| Client | Windows | macOS | Linux |
+|--------|---------|-------|-------|
+| Cursor | `%USERPROFILE%\.cursor\mcp.json` | `~/.cursor/mcp.json` | `~/.cursor/mcp.json` |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | `~/Library/Application Support/Claude/claude_desktop_config.json` | `~/.config/claude-desktop/claude_desktop_config.json` |
+| Windsurf | `%USERPROFILE%\.codeium\windsurf\mcp.json` | `~/.codeium/windsurf/mcp.json` | `~/.codeium/windsurf/mcp.json` |
+
+The install command uses a safe merge — it adds or updates only the `tasksync` entry in `mcpServers` and preserves all other existing entries and config keys.
+
+After installing, **restart the client** to activate the MCP server.
+
+### `tasksync mcp print-config`
+
+Print a ready-to-paste MCP config snippet.
+
+```bash
+# Generic snippet (works for any client)
+tasksync mcp print-config
+
+# Client-specific snippet with config file path
+tasksync mcp print-config --client cursor
+tasksync mcp print-config --client claude-desktop
+tasksync mcp print-config --client windsurf
+```
+
+### `tasksync mcp doctor`
+
+Validate the TaskSync MCP setup on this machine.
+
+```bash
+tasksync mcp doctor
+```
+
+Checks:
+- Whether `tasksync` is on PATH
+- Whether `build/cli.js` exists (for local/dev installs)
+- Which MCP clients are installed and whether they have the `tasksync` entry configured
+- Captured context store status and task count
+
+Example output:
+
+```
+  ● TaskSync CLI
+  ✓  tasksync found on PATH
+     /usr/local/bin/tasksync
+
+  ● MCP client setup
+  ✓  Cursor            ✓ detected  |  config: exists  |  tasksync: ✓ configured
+  ✓  Claude Desktop    ✓ detected  |  config: exists  |  tasksync: ✓ configured
+  ✗  Windsurf          ✗ not detected  ...
+       → Run: tasksync mcp install --client windsurf
+
+  ● Captured context store
+     Path: ~/.TaskSync/captured
+     Status: exists — 3 tasks captured
+     Latest: "Refactoring auth module for multi-tenant support" (2026-03-10)
+```
+
+### TaskSync MCP
+
+TaskSync MCP is a local context hub. It lets MCP-capable assistants both retrieve prior task context and push new context into TaskSync without changing the core storage/sync model.
+
+**Connection model:**
+
+```
+Provider-native tasks  ──► TaskSync ──► MCP read tools ──► any MCP-capable tool
+MCP capture_context    ──► TaskSync ──► same read/query/rehydration paths
+```
+
+It is designed for:
+- cross-assistant context transfer
+- task discovery across all providers
+- summary retrieval
+- transcript inspection
+- workspace context recovery
+- structured rehydration packets
+- **capturing context from any MCP-capable tool into TaskSync**
+
+It is **not** designed for:
+- mutating provider-native task stores (Cline, Roo, etc.)
+- native session restoration inside another app
+- host-specific hacks or private database writes
+- replacing direct sync for supported providers
+
+### Exposed MCP tools
+
+##### Read tools
+
+- `list_tasks` — list tasks across all providers including captured
+- `search_tasks` — full-text search across titles, summaries, and transcripts
+- `get_task_summary` — deterministic summary without model dependency
+- `get_task_transcript` — normalized transcript with optional truncation
+- `get_workspace_context` — workspace path, repo name, and remote URLs
+- `rehydrate_task` — structured continuation packet for cross-assistant rehydration
+
+##### Write tool: `capture_context`
+
+The only write tool. Stores portable context from any MCP-capable assistant into TaskSync-owned storage (`~/.TaskSync/captured/`).
+
+```json
+{
+  "title": "Refactoring auth module for multi-tenant support",
+  "summary": "...",
+  "workspacePath": "/Users/me/projects/myapp",
+  "transcript": "User: ...\nAssistant: ...",
+  "decisions": ["Use JWT with org scoping", "Add refresh token rotation"],
+  "todos": ["Write migration for existing users", "Update OpenAPI spec"],
+  "touchedFiles": ["src/auth/index.ts", "src/middleware/jwt.ts"],
+  "sourceApp": "cursor",
+  "tags": ["auth", "backend"]
+}
+```
+
+Required: `title`, `summary`. Everything else is optional.
+
+Captured tasks are immediately available via `list_tasks`, `search_tasks`, `get_task_summary`, `get_task_transcript`, `get_workspace_context`, and `rehydrate_task`.
+
+**Sync note:** Captured tasks are currently stored locally only in `~/.TaskSync/captured/`. Sync participation (git push/pull of captured tasks) is planned as follow-up work.
+
+### `rehydrate_task` modes
+
+Supported modes:
+
+- `summary`
+- `full_transcript`
+- `decisions_only`
+- `requirements_and_todos`
+- `workspace_context`
+
+These modes produce best-effort structured continuation packets derived from stored task data. They are deterministic and do not depend on an external model.
+
+### Running TaskSync MCP locally
+
+Start the server with:
+
+```bash
+tasksync mcp
+```
+
+The server uses **stdio** transport, which is the preferred v1 transport for local CLI-based MCP integrations.
+
+### Conceptual MCP client configuration
+
+An MCP client typically launches TaskSync like this:
+
+```json
+{
+  "mcpServers": {
+    "tasksync": {
+      "command": "tasksync",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For local development from this repository, you can also point the client at the built CLI:
+
+```json
+{
+  "mcpServers": {
+    "tasksync": {
+      "command": "node",
+      "args": ["/absolute/path/to/tasksync/build/cli.js", "mcp"]
+    }
+  }
+}
+```
+
+### Current limitations
+
+- `capture_context` writes to TaskSync-owned storage only — no provider-native mutation
+- Captured tasks are local-only (sync across machines is follow-up work)
+- No host-native session injection
+- No Cursor-native provider work
+- Transcript normalization is best-effort across provider formats
+- Workspace metadata depends on what the provider stored on disk
+
 ### Authentication Commands
 
-#### `tasksync auth`
+### `tasksync auth`
 Set up GitHub authentication (interactive).
 
 ```bash
@@ -253,7 +476,7 @@ Prompts for a GitHub Personal Access Token and verifies it with the GitHub API. 
 
 **Note:** Keep your token secure. TaskSync stores it locally with restricted permissions (chmod 600).
 
-#### `tasksync auth status`
+### `tasksync auth status`
 Show current authentication status.
 
 ```bash
@@ -266,7 +489,7 @@ Displays:
 - Masked token (first 4 + last 4 characters)
 - Verification timestamp
 
-#### `tasksync auth logout`
+### `tasksync auth logout`
 Remove stored GitHub token.
 
 ```bash
@@ -275,7 +498,7 @@ tasksync auth logout
 
 Deletes `~/.TaskSync/auth.json`. Does not affect environment variables.
 
-#### `tasksync auth verify`
+### `tasksync auth verify`
 Re-verify that the stored token is still valid.
 
 ```bash
@@ -308,16 +531,17 @@ Display help for any command.
 
 ### Sync
 
-Sync keeps the same provider consistent across machines. **Providers are never automatically merged.** Running `tasksync sync --provider cline` syncs only Cline data — Roo, Kilo, and OpenClaw are unaffected.
+Sync keeps the same provider consistent across machines. **Providers are never automatically merged.** Running `tasksync sync --provider cline` syncs only Cline data — Roo and OpenClaw are unaffected.
 
 | Valid sync pairs    |
 |---------------------|
 | Cline ↔ Cline       |
 | Roo ↔ Roo           |
-| Kilo ↔ Kilo         |
 | OpenClaw ↔ OpenClaw |
 
 Cross-provider sync is not supported.
+
+> **Note on Kilo Code:** Kilo is temporarily unsupported. See `kilo-migration-issue.md` for the investigation summary and rationale.
 
 ### Migration
 
@@ -376,7 +600,16 @@ CLINE_DIR=/custom/path
 ROO_DIR=/custom/path
 ```
 
-### Kilo Code
+### Kilo Code (temporarily unsupported)
+
+Kilo is documented here for historical/reference purposes only. TaskSync does **not** currently claim reliable support for Kilo.
+
+Why:
+- Kilo v5 relies on additional extension-managed state beyond the task files on disk
+- Kilo v6+ moved to a different SQLite-based architecture entirely
+- TaskSync cannot currently guarantee reliable sync/migration behavior across Kilo versions
+
+If someone in the community finds a clean integration path, contributions are welcome.
 
 **macOS:**
 ```
@@ -454,13 +687,57 @@ All credentials are handled ephemerally during Git operations and never written 
 
 ---
 
+## Contributing (Commits & Pull Requests)
+
+### Commit Message Format
+
+Use:
+
+```text
+type(scope): short imperative summary
+```
+
+Recommended `type` values:
+
+- `feat` — new behavior
+- `fix` — bug fix
+- `refactor` — internal change (no behavior change)
+- `test` — tests only
+- `docs` — documentation only
+- `chore` — maintenance/tooling
+- `ci` — CI/workflow updates
+
+Examples:
+
+- `feat(mcp): add capture_context validation for tags`
+- `fix(sync): skip pre-pull snapshot when local provider is empty`
+- `test(security): add path traversal regression coverage`
+
+### Pull Request Expectations
+
+Please include the following in your PR description:
+
+1. **What changed** — short summary of behavior/code changes
+2. **Why** — problem/background
+3. **How tested** — commands run (`npm test`, manual dashboard checks, etc.)
+4. **Risk / impact** — providers or sync/migration/security paths affected
+5. **Screenshots/logs** — for dashboard/UI changes
+
+Additional expectations:
+
+- Keep PRs focused and reasonably small.
+- If behavior changes in sync/migration/security logic, add or update tests when feasible.
+- Call out breaking changes explicitly.
+
+---
+
 ## Roadmap
 
+- Sync participation for captured tasks (`~/.TaskSync/captured/` included in git push/pull)
 - Improved native task migration
 - Optional encrypted sync
-- Cross-provider task search
 - Binary builds
-- Cursor support
+- Revisit Kilo support if a robust community-backed integration path emerges
 
 ---
 
