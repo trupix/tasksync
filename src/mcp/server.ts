@@ -236,7 +236,7 @@ const TASKSYNC_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        provider: { type: "string", description: "Optional provider filter: cline, roo, kilo, or openclaw." },
+        provider: { type: "string", description: "Optional provider filter: cline, roo, openclaw, or captured." },
         workspace: { type: "string", description: "Optional workspace/project filter." },
         limit: { type: "number", description: "Optional max results." },
         sort: {

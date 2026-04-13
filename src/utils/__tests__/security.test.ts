@@ -55,8 +55,8 @@ test("redactUrl: redacts embedded credentials in URL", () => {
 test("isValidProvider: accepts known providers", () => {
   assert.ok(isValidProvider("cline"));
   assert.ok(isValidProvider("roo"));
-  assert.ok(isValidProvider("kilo"));
   assert.ok(isValidProvider("openclaw"));
+  assert.ok(isValidProvider("captured"));
 });
 
 test("isValidProvider: rejects unknown providers", () => {

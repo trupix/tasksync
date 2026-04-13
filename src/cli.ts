@@ -53,7 +53,7 @@ export function createProgram(deps: CliDependencies = {}): Command {
   function getRequiredProviderByName(name: string): IProvider {
     const provider = allProviders.find((candidate) => candidate.getProviderName() === name.toLowerCase());
     if (!provider) {
-      console.error(`\n✗  Unknown provider: ${name}. Supported: cline, roo, kilo, openclaw\n`);
+      console.error(`\n✗  Unknown provider: ${name}. Supported: cline, roo, openclaw, captured\n`);
       process.exit(1);
     }
     return provider;
@@ -93,7 +93,7 @@ export function createProgram(deps: CliDependencies = {}): Command {
 
     const targets = detectAllTargets();
     if (targets.length === 0) {
-      console.error(`\n✗  No AI assistant providers detected on this machine.\n   Supported: cline, roo, kilo, openclaw\n`);
+      console.error(`\n✗  No TaskSync providers detected on this machine.\n   Supported: cline, roo, openclaw, captured\n`);
       process.exit(1);
     }
 
@@ -556,8 +556,8 @@ export function createProgram(deps: CliDependencies = {}): Command {
     const targets = detectAllTargets();
 
     if (targets.length === 0) {
-      console.log("  ✗ No AI assistant providers detected on this machine.");
-      console.log("    Supported: Cline, Roo, Kilo Code, OpenClaw");
+      console.log("  ✗ No TaskSync providers detected on this machine.");
+      console.log("    Supported: Cline, Roo, OpenClaw, Captured Context");
       console.log("    Install one and run it at least once, then try again.\n");
       return;
     }

@@ -1,7 +1,8 @@
 /**
- * IProvider — interface every TaskSync provider must implement.
- * Providers represent an AI assistant's data directory (Cline, Roo, Kilo, etc.)
- * For MVP v0.1.0, only the Cline provider is shipped.
+ * IProvider interface every TaskSync provider must implement.
+ * Providers represent either an AI assistant's native data directory
+ * (for example Cline, Roo, OpenClaw) or a TaskSync-owned task store
+ * such as captured MCP context.
  */
 export interface ProviderRoot {
   id: string;
@@ -10,7 +11,7 @@ export interface ProviderRoot {
 }
 
 export interface IProvider {
-  /** Human-readable provider name (e.g. "cline", "roo", "kilo") */
+  /** Human-readable provider name (e.g. "cline", "roo", "openclaw", "captured") */
   getProviderName(): string;
 
   /** 
@@ -26,7 +27,7 @@ export interface IProvider {
   validateRoot(rootPath: string): boolean;
 
   /**
-   * Schema version — bumped when the manifest format or
+   * Schema version ï¿½ bumped when the manifest format or
    * sync behaviour changes in a breaking way. Start at 1.
    */
   getSchemaVersion(): number;

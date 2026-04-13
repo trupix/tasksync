@@ -40,7 +40,7 @@ export function validateRemoteUrl(url: string): void {
 
 /**
  * Run a git command inside `cwd`. All arguments are passed as an array
- * to execFile — no shell is involved, eliminating injection risk.
+ * to execFile ï¿½ no shell is involved, eliminating injection risk.
  *
  * Throws a cleaned-up GitError on non-zero exit code.
  */
@@ -78,7 +78,7 @@ async function gitWithEnv(
   }
 }
 
-/** Typed git error — never carries a stack trace when printed. */
+/** Typed git error ï¿½ never carries a stack trace when printed. */
 export class GitError extends Error {
   constructor(message: string) {
     super(message);
@@ -108,7 +108,7 @@ export function buildEphemeralCredentialEnv(pat: string): {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "TaskSync-cred-"));
   const scriptPath = path.join(tmpDir, "askpass.sh");
 
-  // The script simply prints the PAT — git calls it and reads stdout
+  // The script simply prints the PAT ï¿½ git calls it and reads stdout
   fs.writeFileSync(scriptPath, `#!/bin/sh\necho "${pat.replace(/"/g, '\\"')}"\n`, {
     mode: 0o700,
     encoding: "utf8",
@@ -221,7 +221,7 @@ export async function commit(
 
 /**
  * Pull with rebase. If a PAT is needed, pass it and it will be supplied
- * ephemerally via GIT_ASKPASS — never written to disk.
+ * ephemerally via GIT_ASKPASS ï¿½ never written to disk.
  */
 export async function pullRebase(
   cwd: string,
@@ -262,8 +262,8 @@ export async function pullRebase(
     ) {
       throw new GitError(
         `Authentication failed when pulling from remote.\n` +
-          `  • If using HTTPS, pass --pat <token> or set TaskSync_GIT_TOKEN.\n` +
-          `  • If using SSH, ensure your key is loaded in ssh-agent.\n`
+          `  ï¿½ If using HTTPS, pass --pat <token> or set TaskSync_GIT_TOKEN.\n` +
+          `  ï¿½ If using SSH, ensure your key is loaded in ssh-agent.\n`
       );
     }
     throw e;
@@ -272,7 +272,7 @@ export async function pullRebase(
 
 /**
  * Push to remote. If a PAT is needed, pass it and it will be supplied
- * ephemerally via GIT_ASKPASS — never written to disk.
+ * ephemerally via GIT_ASKPASS ï¿½ never written to disk.
  */
 export async function push(cwd: string, pat?: string): Promise<void> {
   try {
@@ -298,8 +298,8 @@ export async function push(cwd: string, pat?: string): Promise<void> {
     ) {
       throw new GitError(
         `Authentication failed when pushing to remote.\n` +
-          `  • If using HTTPS, pass --pat <token> or set TaskSync_GIT_TOKEN.\n` +
-          `  • If using SSH, ensure your key is loaded in ssh-agent.\n`
+          `  ï¿½ If using HTTPS, pass --pat <token> or set TaskSync_GIT_TOKEN.\n` +
+          `  ï¿½ If using SSH, ensure your key is loaded in ssh-agent.\n`
       );
     }
     if (e.message.includes("rejected")) {
@@ -331,27 +331,52 @@ export function sanitizeRemoteUrl(url: string): string {
 /** Scan tracked + untracked files and warn about anything exceeding `maxMb`. */
 async function warnOversizedFiles(cwd: string, maxMb: number): Promise<void> {
   try {
-    // Use execFile with find — no shell, args as array
-    const { stdout } = await execFileAsync("find", [
-      ".",
-      "-not",
-      "-path",
-      "./.git/*",
-      "-type",
-      "f",
-      "-size",
-      `+${maxMb}M`,
-    ], { cwd });
-    const files = (stdout ?? "").trim().split("\n").filter(Boolean);
-    if (files.length > 0) {
+    const thresholdBytes = maxMb * 1024 * 1024;
+    const oversized: string[] = [];
+
+    const walk = (dir: string): void => {
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relPath = path.relative(cwd, fullPath);
+
+        if (entry.name === ".git") continue;
+
+        if (entry.isDirectory()) {
+          walk(fullPath);
+          continue;
+        }
+
+        if (!entry.isFile()) continue;
+
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.size > thresholdBytes) {
+            oversized.push(relPath);
+          }
+        } catch {
+          // Skip unreadable files.
+        }
+      }
+    };
+
+    walk(cwd);
+
+    if (oversized.length > 0) {
       console.warn(
-        `\n?  The following files exceed ${maxMb} MB and will be skipped:\n` +
-          files.map((f) => `   ${f}`).join("\n") +
+        `\nâš   The following files exceed ${maxMb} MB and may not be suitable for sync:\n` +
+          oversized.map((f) => `   ${f}`).join("\n") +
           "\n" +
           `   Add them to .gitignore inside ${cwd} to silence this warning.\n`
       );
     }
   } catch {
-    // find not available / permission issue — skip silently.
+    // Best-effort warning only.
   }
 }

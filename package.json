@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node build/cli.js",
-    "test": "npx tsx src/utils/__tests__/security.test.ts && npx tsx src/utils/__tests__/git-injection.test.ts && npx tsx src/core/tasks/__tests__/migration.test.ts && npx tsx src/mcp/__tests__/mcp.test.ts"
+    "test": "npm run build && npx tsx src/utils/__tests__/security.test.ts && npx tsx src/utils/__tests__/git-injection.test.ts && npx tsx src/core/tasks/__tests__/migration.test.ts && npx tsx src/mcp/__tests__/mcp.test.ts"
   },
   "keywords": [
     "cline",

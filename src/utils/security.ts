@@ -166,7 +166,7 @@ export function safeRmDir(parentDir: string, childSegment: string): void {
 
 // --- Request field validators ------------------------------------------------
 
-const VALID_PROVIDERS = ["cline", "roo", "kilo", "openclaw"];
+const VALID_PROVIDERS = ["cline", "roo", "openclaw", "captured"];
 
 /**
  * Validate that a provider name is one of the known providers.

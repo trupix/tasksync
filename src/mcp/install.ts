@@ -190,7 +190,6 @@ const RESTART_HINTS: Record<SupportedClient, string> = {
 const PROVIDER_CLIENT_MAP: Partial<Record<string, SupportedClient>> = {
   cline: "cline",
   roo: "roo",
-  kilo: "kilo",
 };
 
 export function getClientForProvider(providerName: string): SupportedClient | null {
